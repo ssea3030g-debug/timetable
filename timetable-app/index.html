@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="manifest" href="manifest.webmanifest">
+<script>window.__SYNC__={owner:"ssea3030g-debug",repo:"timetable",path:"data/state.json",branch:"main"}</script>
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="theme-color" content="#f3f5f9" media="(prefers-color-scheme: light)">
@@ -36,6 +37,7 @@
   color-scheme:dark }
 
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{background:var(--bg);color:var(--fg);font-family:var(--font);font-size:14px;line-height:1.45}
 .wrap{max-width:900px;margin:0 auto;padding-block:20px 48px;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
@@ -123,6 +125,12 @@ section{display:flex;flex-direction:column;gap:10px;min-width:0}
 .nt{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
 .reset{align-self:flex-start;font:inherit;font-size:12px;cursor:pointer;background:transparent;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
 .note{font-size:11.5px;color:var(--muted);margin:0}
+.syncbox{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:8px}
+.syncbox .frow{grid-template-columns:1fr auto}
+.syncbox details{font-size:12.5px;color:var(--muted)}
+.syncbox summary{cursor:pointer;font-weight:600;color:var(--fg)}
+.syncbox ol{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:3px}
+.syncbox .bad{color:var(--warn);font-size:12.5px;font-weight:600}
 .none{padding:24px 12px;text-align:center;color:var(--muted);font-size:13px}
 </style>
 
@@ -163,6 +171,26 @@ section{display:flex;flex-direction:column;gap:10px;min-width:0}
     <div class="list" id="list"></div>
   </section>
 
+  <section id="sync" class="syncbox" hidden>
+    <h2>기기 간 동기화</h2>
+    <p class="note" id="sync-msg"></p>
+    <div class="frow">
+      <input id="sync-token" type="password" placeholder="GitHub 토큰 붙여넣기 (이 기기에만 저장)" autocomplete="off" aria-label="GitHub 토큰">
+      <button type="button" class="tab" id="sync-save">연결</button>
+    </div>
+    <button type="button" class="reset" id="sync-off" hidden>이 기기 연결 해제</button>
+    <details>
+      <summary>토큰 만드는 법</summary>
+      <ol>
+        <li>GitHub → 프로필 → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token</li>
+        <li>Repository access는 Only select repositories에서 timetable만 선택</li>
+        <li>Permissions → Repository permissions → Contents를 Read and write로 설정</li>
+        <li>만든 토큰을 복사해서 위 칸에 붙여넣고 연결</li>
+      </ol>
+      <p class="note">저장소가 공개라서, 담은 수업과 신청 상태 파일(data/state.json)은 주소를 아는 누구나 읽을 수 있어요. 토큰은 이 기기 브라우저에만 저장되고 언제든 GitHub에서 폐기할 수 있습니다.</p>
+    </details>
+  </section>
+
   <section>
     <p class="note">강좌 정보는 올려주신 겨울방학 강좌표 PDF(MEXX·미래탐구·새움·세정·대치명인)와 수강신청 캡처(MEXX·두각)를 합친 것입니다. 시간표는 요일·시간 기준 주간 반복이라, 개강일이 다른 수업끼리도 같은 시간이면 겹침으로 표시됩니다. 12/24 이전에 시작하는 단기 특강은 정규 수업과의 겹침 검사와 주간 합계에서 뺐습니다. 신청 상태는 처음에 모두 '미신청'이고, 각 수업에서 직접 바꾼 값만 저장됩니다.</p>
     <button class="reset" id="reset" type="button">시간표 모두 비우기</button>
@@ -184,7 +212,7 @@ const dfirst=i=>Math.min(...i.days.map(d=>DAYS.indexOf(d)));
 const defaults=()=>Object.fromEntries(ITEMS.map(i=>[i.id,false]));
 let on=defaults();
 try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s)for(const k in on)if(k in s)on[k]=!!s[k]}catch(e){}
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(on))}catch(e){}};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(on))}catch(e){}touch()};
 let F={mode:'all',sj:'',ac:'',day:'',kind:'',q:''};
 try{const s=JSON.parse(localStorage.getItem(FKEY)||'null');if(s)F=Object.assign(F,s)}catch(e){}
 const saveF=()=>{try{localStorage.setItem(FKEY,JSON.stringify(F))}catch(e){}};
@@ -192,7 +220,7 @@ const saveF=()=>{try{localStorage.setItem(FKEY,JSON.stringify(F))}catch(e){}};
 const SKEY='winter-tt-status-v1';
 const ORIG={};ITEMS.forEach(i=>ORIG[i.id]={st:i.st,q:i.q,ord:i.ord,lab:i.lab,closed:i.closed});
 let OV={};try{OV=JSON.parse(localStorage.getItem(SKEY)||'{}')||{}}catch(e){OV={}}
-const saveOV=()=>{try{localStorage.setItem(SKEY,JSON.stringify(OV))}catch(e){}};
+const saveOV=()=>{try{localStorage.setItem(SKEY,JSON.stringify(OV))}catch(e){}touch()};
 function applyOv(i){
   const g=ORIG[i.id],o=OV[i.id];
   if(!o){Object.assign(i,{st:g.st,q:g.q,ord:g.ord,lab:g.lab,closed:g.closed});return}
@@ -316,6 +344,73 @@ document.addEventListener('change',e=>{
   applyOv(it);saveOV();render();
 });
 fillSelects();render();
+
+/* ---- 기기 간 동기화: GitHub 저장소의 data/state.json 에 저장 (설치형 앱에서만) ---- */
+const SYNC=window.__SYNC__||null;
+const TKEY='winter-tt-token',MKEY='winter-tt-modified';
+let sha=null,timer=null,syncMsg='';
+const lget=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
+const lset=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
+const token=()=>lget(TKEY)||'';
+const localT=()=>+lget(MKEY)||0;
+function touch(){if(!SYNC)return;lset(MKEY,String(Date.now()));clearTimeout(timer);if(token())timer=setTimeout(push,1500)}
+const snap=()=>JSON.stringify({v:1,t:localT(),on:Object.fromEntries(Object.entries(on).filter(([,v])=>v)),ov:OV});
+const b64e=s=>btoa(String.fromCharCode(...new TextEncoder().encode(s)));
+const b64d=s=>new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\n/g,'')),c=>c.charCodeAt(0)));
+const API=()=>`https://api.github.com/repos/${SYNC.owner}/${SYNC.repo}/contents/${SYNC.path}`;
+const hdr=()=>({Authorization:'Bearer '+token(),Accept:'application/vnd.github+json'});
+function setMsg(t,bad){const el=$('sync-msg');el.textContent=t;el.className=bad?'bad':'note'}
+function paintSync(){
+  const on_=!!token();
+  $('sync-off').hidden=!on_;$('sync-token').value='';
+  $('sync-token').placeholder=on_?'토큰 바꾸려면 새 토큰 붙여넣기':'GitHub 토큰 붙여넣기 (이 기기에만 저장)';
+  setMsg(syncMsg||(on_?'연결됨 · 담은 수업과 신청 상태를 바꾸면 자동으로 저장돼요.':'연결하지 않은 기기에서는 저장된 내용을 보기만 할 수 있어요(최대 5분 늦게 반영). 이 기기에서 바꾸려면 토큰으로 연결하세요.'));
+}
+function adopt(r){
+  const ids=new Set(ITEMS.map(i=>i.id));
+  on=defaults();Object.keys(r.on||{}).forEach(k=>{if(ids.has(k))on[k]=true});
+  OV={};Object.entries(r.ov||{}).forEach(([k,v])=>{if(ids.has(k))OV[k]=v});
+  ITEMS.forEach(applyOv);
+  try{localStorage.setItem(KEY,JSON.stringify(on));localStorage.setItem(SKEY,JSON.stringify(OV))}catch(e){}
+  lset(MKEY,String(r.t||0));render();
+}
+async function pull(){
+  if(token()){
+    const res=await fetch(API()+'?ref='+SYNC.branch+'&t='+Date.now(),{headers:hdr(),cache:'no-store'});
+    if(res.status===404){sha=null;return null}
+    if(res.status===401||res.status===403)throw new Error('토큰이 맞지 않거나 권한이 없어요(Contents: Read and write 필요).');
+    if(!res.ok)throw new Error('GitHub 응답 '+res.status);
+    const j=await res.json();sha=j.sha;return JSON.parse(b64d(j.content));
+  }
+  const res=await fetch(`https://raw.githubusercontent.com/${SYNC.owner}/${SYNC.repo}/${SYNC.branch}/${SYNC.path}?t=${Date.now()}`,{cache:'no-store'});
+  return res.ok?await res.json():null;
+}
+async function push(retry){
+  if(!token())return;
+  try{
+    const body={message:'시간표 동기화',content:b64e(snap()),branch:SYNC.branch};if(sha)body.sha=sha;
+    const res=await fetch(API(),{method:'PUT',headers:hdr(),body:JSON.stringify(body)});
+    if((res.status===409||res.status===422)&&!retry){const r=await pull();if(r&&r.t>localT()){adopt(r);syncMsg='';paintSync();return}return push(true)}
+    if(res.status===401||res.status===403)throw new Error('토큰이 맞지 않거나 권한이 없어요(Contents: Read and write 필요).');
+    if(!res.ok)throw new Error('저장 실패 '+res.status);
+    sha=(await res.json()).content.sha;
+    syncMsg='연결됨 · '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'})+'에 저장했어요.';paintSync();
+  }catch(e){syncMsg=e.message||'저장하지 못했어요. 인터넷을 확인하세요.';setMsg(syncMsg,true)}
+}
+async function syncNow(){
+  try{
+    const r=await pull();
+    if(r&&r.t>localT()){adopt(r);syncMsg=token()?'연결됨 · 다른 기기의 내용을 불러왔어요.':'저장된 내용을 불러왔어요(보기 전용).'}
+    else if(token()&&(r===null?localT()>0:localT()>r.t)){await push();return}
+    paintSync();
+  }catch(e){syncMsg=e.message||'불러오지 못했어요.';setMsg(syncMsg,true)}
+}
+if(SYNC){
+  $('sync').hidden=false;paintSync();syncNow();
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncNow()});
+  $('sync-save').addEventListener('click',()=>{const v=$('sync-token').value.trim();if(!v)return;lset(TKEY,v);sha=null;syncMsg='';paintSync();syncNow()});
+  $('sync-off').addEventListener('click',()=>{try{localStorage.removeItem(TKEY)}catch(e){}sha=null;syncMsg='';paintSync()});
+}
 </script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{})</script>
 </body>
