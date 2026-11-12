@@ -137,6 +137,7 @@ section{display:flex;flex-direction:column;gap:10px;min-width:0}
 
   <section>
     <div class="stats" id="stats"></div>
+    <div class="stats" id="mystat"></div>
     <div id="conflicts"></div>
   </section>
 
@@ -224,8 +225,9 @@ function renderTop(cl){
   const hrs=wk.reduce((s,i)=>s+(mins(i.b)-mins(i.a))*i.days.length,0)/60;
   const ses=wk.reduce((s,i)=>s+i.days.length,0);
   $('stats').innerHTML=`<span><b>${act.length}</b> 담은 수업</span><span><b>${ses}</b> 수업/주</span><span><b>${hrs%1?hrs.toFixed(1):hrs}</b> 시간/주</span>`+
-    `<span><b>${act.filter(i=>i.st==='ok').length}</b> 확정</span><span><b>${act.filter(i=>i.st==='w').length}</b> 신청중·대기</span><span><b>${act.filter(i=>i.st==='c').length}</b> 미신청</span>`+
     `<span class="${cl.length?'bad':''}"><b>${cl.length}</b> 겹침</span>`;
+  const n=s=>ITEMS.filter(i=>i.st===s).length;
+  $('mystat').innerHTML=`<span>내 신청 전체</span><span><b>${n('ok')}</b> 신청완료</span><span><b>${n('w')}</b> 신청중·대기</span>`;
   $('conflicts').innerHTML=!act.length?'':cl.length
     ?`<div class="conflicts">${cl.map(c=>`<div><strong>${c.d}요일 ${BL[band(c.p)][0]}</strong> · ${esc(tname(c.p))} ${esc(c.p.d)} ↔ ${esc(tname(c.q))} ${esc(c.q.d)}</div>`).join('')}</div>`
     :`<div class="ok">겹치는 수업이 없습니다.</div>`;
