@@ -376,34 +376,39 @@ function wrapText(ctx,text,maxW){
 function rr(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
 function drawTimetable(all){
   const act=all.filter(i=>!i.per),shorts=all.filter(i=>i.per);
-  const S=2,W=1200,LW=64,P=16,G=6,HH=32,cw=(W-P*2-LW-G*7)/7,pad=7;
+  const S=2,W=800,LW=42,P=14,G=4,HH=30,cw=(W-P*2-LW-G*7)/7,pad=5;
   const cv=document.createElement('canvas'),ctx=cv.getContext('2d');
   const prep=i=>{
-    ctx.font=`400 11.5px ${FONT}`;
-    const tl=wrapText(ctx,i.d+(i.n?` (${i.n}회)`:''),cw-2*pad-4).slice(0,4);
+    ctx.font=`400 10.5px ${FONT}`;
+    const full=wrapText(ctx,i.d+(i.n?` (${i.n}회)`:''),cw-2*pad-6),tl=full.slice(0,5);
+    if(full.length>5)tl[4]=tl[4].replace(/.$/,'…');
     const lines=[];
-    lines.push({t:`${i.a}–${i.b}${i.ac?' · '+i.ac:''}`,f:`400 10.5px ${FONT}`,c:'#5b6578',h:14});
-    lines.push({t:tname(i),f:`700 13px ${FONT}`,c:SJC[i.s]||'#111a2e',h:17});
-    tl.forEach((x,k)=>lines.push({t:(k===3&&wrapText(ctx,i.d,9999).length>0&&tl.length===4?x.replace(/.$/,'…'):x),f:`400 11.5px ${FONT}`,c:'#111a2e',h:15}));
-    if(i.per)lines.push({t:i.per,f:`400 10.5px ${FONT}`,c:'#5b6578',h:14});
-    if(i.st!=='c')lines.push({t:stLabel(i),f:`600 10.5px ${FONT}`,c:'#5b6578',h:14});
+    lines.push({t:`${i.a}–${i.b}`,f:`400 9.5px ${FONT}`,c:'#5b6578',h:13});
+    if(i.ac)lines.push({t:i.ac,f:`400 9.5px ${FONT}`,c:'#5b6578',h:12});
+    ctx.font=`700 12px ${FONT}`;const nf=ctx.measureText(tname(i)).width>cw-2*pad-6?`700 10px ${FONT}`:`700 12px ${FONT}`;
+    lines.push({t:tname(i),f:nf,c:SJC[i.s]||'#111a2e',h:16});
+    tl.forEach(x=>lines.push({t:x,f:`400 10.5px ${FONT}`,c:'#111a2e',h:14}));
+    if(i.per)lines.push({t:i.per,f:`400 9.5px ${FONT}`,c:'#5b6578',h:13});
+    if(i.st!=='c')lines.push({t:stLabel(i),f:`600 9.5px ${FONT}`,c:'#5b6578',h:13});
     return {i,lines,h:lines.reduce((a,l)=>a+l.h,0)+pad*2-2};
   };
   const rows=[0,1,2].map(b=>DAYS.map(d=>act.filter(i=>i.days.includes(d)&&band(i)===b).sort((m,n)=>mins(m.a)-mins(n.a)).map(prep)));
-  const rh=rows.map(r=>Math.max(64,...r.map(c=>c.reduce((a,x)=>a+x.h+G,0)+G)));
+  const rh=rows.map(r=>Math.max(58,...r.map(c=>c.reduce((a,x)=>a+x.h+G,0)+G)));
   const foot=shorts.map(i=>`단기 · ${tname(i)} ${i.d}${i.n?` (${i.n}회)`:''} · ${i.per} · ${i.days.length>3?'매일':i.days.join('·')} ${i.a}–${i.b}${i.ac?' · '+i.ac:''}`);
-  const H=P+HH+G+rh.reduce((a,h)=>a+h+G,0)+(foot.length?foot.length*18+8:0)+P-G+G;
+  ctx.font=`400 11px ${FONT}`;
+  const footL=foot.flatMap(t=>wrapText(ctx,t,W-P*2-LW-G));
+  const H=P+HH+G+rh.reduce((a,h)=>a+h+G,0)+(footL.length?footL.length*16+8:0)+P-G+G;
   cv.width=W*S;cv.height=Math.ceil(H)*S;ctx.scale(S,S);
   ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
   const cx=d=>P+LW+G+d*(cw+G);
   ctx.textBaseline='alphabetic';
   DAYS.forEach((d,di)=>{ctx.fillStyle='#e9edf4';rr(ctx,cx(di),P,cw,HH,6);ctx.fill();
-    ctx.fillStyle=di>4?'#c2330f':'#111a2e';ctx.font=`700 15px ${FONT}`;ctx.textAlign='center';ctx.fillText(d,cx(di)+cw/2,P+HH/2+5.5)});
+    ctx.fillStyle=di>4?'#c2330f':'#111a2e';ctx.font=`700 14px ${FONT}`;ctx.textAlign='center';ctx.fillText(d,cx(di)+cw/2,P+HH/2+5)});
   let y=P+HH+G;
   const BL=[['오전','~13시 전'],['오후','13–18시'],['저녁','18시~']];
   rows.forEach((r,b)=>{
-    ctx.textAlign='center';ctx.fillStyle='#111a2e';ctx.font=`700 12.5px ${FONT}`;ctx.fillText(BL[b][0],P+LW/2,y+rh[b]/2-1);
-    ctx.fillStyle='#5b6578';ctx.font=`400 9.5px ${FONT}`;ctx.fillText(BL[b][1],P+LW/2,y+rh[b]/2+12);
+    ctx.textAlign='center';ctx.fillStyle='#111a2e';ctx.font=`700 11.5px ${FONT}`;ctx.fillText(BL[b][0],P+LW/2,y+rh[b]/2-1);
+    ctx.fillStyle='#5b6578';ctx.font=`400 8px ${FONT}`;ctx.fillText(BL[b][1],P+LW/2,y+rh[b]/2+11);
     r.forEach((cell,d)=>{
       ctx.fillStyle='#ffffff';ctx.strokeStyle='#d5dbe6';ctx.lineWidth=1;ctx.setLineDash([]);
       rr(ctx,cx(d),y,cw,rh[b],6);ctx.fill();ctx.stroke();
@@ -420,7 +425,7 @@ function drawTimetable(all){
     });
     y+=rh[b]+G;
   });
-  if(foot.length){ctx.textAlign='left';ctx.fillStyle='#5b6578';ctx.font=`400 12px ${FONT}`;foot.forEach((t,k)=>ctx.fillText(t,P+LW+G,y+8+14+k*18))}
+  if(footL.length){ctx.textAlign='left';ctx.fillStyle='#5b6578';ctx.font=`400 11px ${FONT}`;footL.forEach((t,k)=>ctx.fillText(t,P+LW+G,y+8+13+k*16))}
   return cv;
 }
 function closeModal(){const m=$('shot-modal');if(m){URL.revokeObjectURL(m.dataset.url||'');m.remove()}}
