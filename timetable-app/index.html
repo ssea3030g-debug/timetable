@@ -131,6 +131,16 @@ section{display:flex;flex-direction:column;gap:10px;min-width:0}
 .syncbox summary{cursor:pointer;font-weight:600;color:var(--fg)}
 .syncbox ol{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:3px}
 .syncbox .bad{color:var(--warn);font-size:12.5px;font-weight:600}
+.shbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.shbar .hint{flex:1;min-width:160px}
+.modal{position:fixed;inset:0;z-index:50;background:rgba(5,9,16,.82);display:flex;flex-direction:column;align-items:center;gap:10px;overflow:auto;
+  padding-top:max(16px,env(safe-area-inset-top,0px));padding-bottom:max(16px,env(safe-area-inset-bottom,0px));
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.modal img{max-width:100%;height:auto;border-radius:8px;background:#fff;flex:none}
+.modal .mt{color:#fff;font-size:13px;text-align:center;margin:0}
+.modal .mb{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.modal .mb button{font:inherit;font-size:13px;font-weight:600;cursor:pointer;border-radius:999px;padding:8px 16px;border:1.5px solid #fff;background:transparent;color:#fff}
+.modal .mb button.pri{background:#fff;color:#0b1a38}
 .none{padding:24px 12px;text-align:center;color:var(--muted);font-size:13px}
 </style>
 
@@ -152,7 +162,10 @@ section{display:flex;flex-direction:column;gap:10px;min-width:0}
   <section>
     <div class="legend" id="legend"></div>
     <div class="scroll"><div class="grid" id="grid"></div></div>
-    <p class="hint">표는 옆으로 밀어서 볼 수 있어요. 칸을 누르면 시간표에서 빠집니다.</p>
+    <div class="shbar">
+      <button type="button" class="tab" id="share-btn">공유하기</button>
+      <span class="hint" id="share-msg">시간표 사진만 저장돼요. 표는 옆으로 밀어서 볼 수 있고, 칸을 누르면 시간표에서 빠집니다.</span>
+    </div>
   </section>
 
   <section>
@@ -344,6 +357,96 @@ document.addEventListener('change',e=>{
   applyOv(it);saveOV();render();
 });
 fillSelects();render();
+
+/* ---- 시간표 사진 만들기·저장·공유 ---- */
+const SJC={kor:'#b3261e',math:'#1d5fd0',eng:'#7a3fc4',sci:'#0c7c59',soc:'#b06a00',his:'#5a6472',sci2:'#0a7a8f',soc2:'#a23e86',ess:'#5c7a1c'};
+const FONT='"IBM Plex Sans KR","Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",sans-serif';
+function wrapText(ctx,text,maxW){
+  const out=[];let line='';
+  for(const w of String(text).split(' ')){
+    const t=line?line+' '+w:w;
+    if(ctx.measureText(t).width<=maxW){line=t;continue}
+    if(line)out.push(line);line='';
+    let cur='';
+    for(const ch of w){if(ctx.measureText(cur+ch).width>maxW&&cur){out.push(cur);cur=ch}else cur+=ch}
+    line=cur;
+  }
+  if(line)out.push(line);return out;
+}
+function rr(ctx,x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
+function drawTimetable(all){
+  const act=all.filter(i=>!i.per),shorts=all.filter(i=>i.per);
+  const S=2,W=1200,LW=64,P=16,G=6,HH=32,cw=(W-P*2-LW-G*7)/7,pad=7;
+  const cv=document.createElement('canvas'),ctx=cv.getContext('2d');
+  const prep=i=>{
+    ctx.font=`400 11.5px ${FONT}`;
+    const tl=wrapText(ctx,i.d+(i.n?` (${i.n}회)`:''),cw-2*pad-4).slice(0,4);
+    const lines=[];
+    lines.push({t:`${i.a}–${i.b}${i.ac?' · '+i.ac:''}`,f:`400 10.5px ${FONT}`,c:'#5b6578',h:14});
+    lines.push({t:tname(i),f:`700 13px ${FONT}`,c:SJC[i.s]||'#111a2e',h:17});
+    tl.forEach((x,k)=>lines.push({t:(k===3&&wrapText(ctx,i.d,9999).length>0&&tl.length===4?x.replace(/.$/,'…'):x),f:`400 11.5px ${FONT}`,c:'#111a2e',h:15}));
+    if(i.per)lines.push({t:i.per,f:`400 10.5px ${FONT}`,c:'#5b6578',h:14});
+    if(i.st!=='c')lines.push({t:stLabel(i),f:`600 10.5px ${FONT}`,c:'#5b6578',h:14});
+    return {i,lines,h:lines.reduce((a,l)=>a+l.h,0)+pad*2-2};
+  };
+  const rows=[0,1,2].map(b=>DAYS.map(d=>act.filter(i=>i.days.includes(d)&&band(i)===b).sort((m,n)=>mins(m.a)-mins(n.a)).map(prep)));
+  const rh=rows.map(r=>Math.max(64,...r.map(c=>c.reduce((a,x)=>a+x.h+G,0)+G)));
+  const foot=shorts.map(i=>`단기 · ${tname(i)} ${i.d}${i.n?` (${i.n}회)`:''} · ${i.per} · ${i.days.length>3?'매일':i.days.join('·')} ${i.a}–${i.b}${i.ac?' · '+i.ac:''}`);
+  const H=P+HH+G+rh.reduce((a,h)=>a+h+G,0)+(foot.length?foot.length*18+8:0)+P-G+G;
+  cv.width=W*S;cv.height=Math.ceil(H)*S;ctx.scale(S,S);
+  ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);
+  const cx=d=>P+LW+G+d*(cw+G);
+  ctx.textBaseline='alphabetic';
+  DAYS.forEach((d,di)=>{ctx.fillStyle='#e9edf4';rr(ctx,cx(di),P,cw,HH,6);ctx.fill();
+    ctx.fillStyle=di>4?'#c2330f':'#111a2e';ctx.font=`700 15px ${FONT}`;ctx.textAlign='center';ctx.fillText(d,cx(di)+cw/2,P+HH/2+5.5)});
+  let y=P+HH+G;
+  const BL=[['오전','~13시 전'],['오후','13–18시'],['저녁','18시~']];
+  rows.forEach((r,b)=>{
+    ctx.textAlign='center';ctx.fillStyle='#111a2e';ctx.font=`700 12.5px ${FONT}`;ctx.fillText(BL[b][0],P+LW/2,y+rh[b]/2-1);
+    ctx.fillStyle='#5b6578';ctx.font=`400 9.5px ${FONT}`;ctx.fillText(BL[b][1],P+LW/2,y+rh[b]/2+12);
+    r.forEach((cell,d)=>{
+      ctx.fillStyle='#ffffff';ctx.strokeStyle='#d5dbe6';ctx.lineWidth=1;ctx.setLineDash([]);
+      rr(ctx,cx(d),y,cw,rh[b],6);ctx.fill();ctx.stroke();
+      let yy=y+G;
+      cell.forEach(({i,lines,h})=>{
+        const col=SJC[i.s]||'#5a6472';
+        ctx.setLineDash(i.st==='w'?[5,3]:i.st==='c'?[2,3]:[]);
+        ctx.fillStyle=i.st==='c'?'#ffffff':col+'1f';ctx.strokeStyle=col;ctx.lineWidth=1.5;
+        rr(ctx,cx(d)+3,yy,cw-6,h,5);ctx.fill();ctx.stroke();ctx.setLineDash([]);
+        let ty=yy+pad-1;ctx.textAlign='left';
+        lines.forEach(l=>{ctx.font=l.f;ctx.fillStyle=l.c;ctx.fillText(l.t,cx(d)+3+pad,ty+l.h-4);ty+=l.h});
+        yy+=h+G;
+      });
+    });
+    y+=rh[b]+G;
+  });
+  if(foot.length){ctx.textAlign='left';ctx.fillStyle='#5b6578';ctx.font=`400 12px ${FONT}`;foot.forEach((t,k)=>ctx.fillText(t,P+LW+G,y+8+14+k*18))}
+  return cv;
+}
+function closeModal(){const m=$('shot-modal');if(m){URL.revokeObjectURL(m.dataset.url||'');m.remove()}}
+async function shareTimetable(){
+  const act=ITEMS.filter(i=>on[i.id]);
+  const msg=$('share-msg');
+  if(!act.length){msg.textContent='시간표에 담은 수업이 없어요. 수업을 담은 뒤 눌러 주세요.';return}
+  try{await (document.fonts&&document.fonts.ready)}catch(e){}
+  const cv=drawTimetable(act);
+  const blob=await new Promise(r=>cv.toBlob(r,'image/png'));
+  if(!blob){msg.textContent='사진을 만들지 못했어요.';return}
+  const name='timetable-winter.png',url=URL.createObjectURL(blob);
+  let saved=false;
+  try{const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();saved=true}catch(e){}
+  closeModal();
+  const file=new File([blob],name,{type:'image/png'});
+  const canShare=!!(navigator.canShare&&navigator.canShare({files:[file]}));
+  const m=document.createElement('div');m.id='shot-modal';m.className='modal';m.dataset.url=url;
+  m.innerHTML=`<p class="mt">${saved?'시간표 사진을 저장했어요. 저장이 안 되면 사진을 길게 눌러 저장하세요.':'사진을 길게 눌러 저장하세요.'}</p><img alt="시간표 사진" src="${url}"><div class="mb">${canShare?'<button type="button" class="pri" id="shot-share">다른 앱으로 공유</button>':''}<button type="button" id="shot-close">닫기</button></div>`;
+  document.body.appendChild(m);
+  $('shot-close').onclick=closeModal;
+  m.addEventListener('click',e=>{if(e.target===m)closeModal()});
+  const sb=$('shot-share');if(sb)sb.onclick=async()=>{try{await navigator.share({files:[file]})}catch(e){}};
+  msg.textContent='시간표 사진만 저장돼요. 표는 옆으로 밀어서 볼 수 있고, 칸을 누르면 시간표에서 빠집니다.';
+}
+$('share-btn').addEventListener('click',shareTimetable);
 
 /* ---- 기기 간 동기화: GitHub 저장소의 data/state.json 에 저장 (설치형 앱에서만) ---- */
 const SYNC=window.__SYNC__||null;
