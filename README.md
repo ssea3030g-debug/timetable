@@ -13,6 +13,9 @@
 ## 앱 올리기
 저장소 Settings → Pages → Source 를 **GitHub Actions** 로 → Actions 탭에서 **시간표 앱 배포** 실행 → 요약의 주소 열기.
 
+## 지금 운영 중인 서버
+`https://timetable-server.ssea3030g.workers.dev` (앱에는 이 주소가 미리 들어 있어서 코드만 적으면 됩니다.)
+
 ## 서버 올리기 (컴퓨터 없이 휴대폰으로, 한 번만)
 GitHub 가 대신 올려 줍니다(`.github/workflows/server.yml`). 비용은 무료(Cloudflare Workers 무료 범위)입니다.
 서버는 **한 번만** 만들면 모두가 같이 씁니다.
