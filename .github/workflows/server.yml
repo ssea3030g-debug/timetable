@@ -1,0 +1,89 @@
+# 시간표 서버를 Cloudflare Workers 에 올림 — 컴퓨터 없이 휴대폰으로 가능
+# 준비 (저장소 Settings → Secrets and variables → Actions → Secrets):
+#   CLOUDFLARE_API_TOKEN   Cloudflare "Workers 편집" API 토큰
+#   CLOUDFLARE_ACCOUNT_ID  Cloudflare 계정 ID
+#   APP_PASSCODE           시간표 앱에 넣을 비밀번호 (아무 말이나, 한글 가능)
+# 비밀값을 넣은 뒤에는 Actions 탭에서 이 작업을 "Re-run all jobs" 하면 됩니다.
+name: 시간표 서버 배포
+
+on:
+  push:
+    branches: [main]
+    paths: ["server/**", ".github/workflows/server.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: timetable-server
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      APP_PASSCODE: ${{ secrets.APP_PASSCODE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install --no-audit --no-fund
+      - name: 시험
+        run: npm test
+
+      - name: 준비 확인
+        id: ready
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ] || [ -z "$APP_PASSCODE" ]; then
+            {
+              echo "## ⏸️ 아직 올리지 않았어요"
+              echo "저장소 **Settings → Secrets and variables → Actions** 에 \`CLOUDFLARE_API_TOKEN\`, \`CLOUDFLARE_ACCOUNT_ID\`, \`APP_PASSCODE\` 를 모두 넣은 뒤"
+              echo "이 화면 오른쪽 위 **Re-run all jobs** 를 눌러 주세요."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "go=no" >> "$GITHUB_OUTPUT"
+          else
+            echo "go=yes" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Cloudflare 에 올리기
+        id: deploy
+        if: steps.ready.outputs.go == 'yes'
+        run: |
+          set -o pipefail
+          npx wrangler deploy 2>&1 | tee deploy.log
+          url=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' deploy.log | head -1)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: 비밀번호 넣기
+        if: steps.ready.outputs.go == 'yes'
+        run: |
+          printf '%s' "$APP_PASSCODE" | npx wrangler secret put APP_PASSCODE > /dev/null
+          echo "비밀번호를 넣었어요"
+
+      - name: 연결 확인
+        if: steps.ready.outputs.go == 'yes'
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          sleep 10
+          health=$(curl -s -H "Origin: https://ssea3030g-debug.github.io" "$URL/health" || true)
+          if echo "$health" | grep -q '"passcode":true'; then ok="✅ 작동"
+          elif [ -n "$health" ]; then ok="⚠️ 비밀번호가 아직 반영되지 않았어요. 잠시 뒤 다시 실행해 보세요"
+          else ok="❌ 응답 없음"; fi
+          {
+            echo "## ✅ 서버를 올렸어요"
+            echo ""
+            echo "**서버 주소** (시간표 앱 → 맨 아래 \"기기 간 동기화\"에 넣으세요):"
+            echo ""
+            echo "\`$URL\`"
+            echo ""
+            echo "- 연결 확인: $ok"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "$ok"

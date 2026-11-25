@@ -204,19 +204,30 @@ section{display:flex;flex-direction:column;gap:10px;min-width:0}
     <h2>기기 간 동기화</h2>
     <p class="note" id="sync-msg"></p>
     <div class="frow">
-      <input id="sync-token" type="password" placeholder="GitHub 토큰 붙여넣기 (이 기기에만 저장)" autocomplete="off" aria-label="GitHub 토큰">
-      <button type="button" class="tab" id="sync-save">연결</button>
+      <input id="sync-url" type="url" placeholder="서버 주소 (https://….workers.dev)" autocomplete="off" aria-label="서버 주소">
+      <input id="sync-pass" type="password" placeholder="비밀번호" autocomplete="off" aria-label="서버 비밀번호">
     </div>
-    <button type="button" class="reset" id="sync-off" hidden>이 기기 연결 해제</button>
+    <div class="shbar"><button type="button" class="tab" id="sync-srv">서버 연결</button><button type="button" class="reset" id="sync-off" hidden>이 기기 연결 해제</button></div>
     <details>
-      <summary>토큰 만드는 법</summary>
+      <summary>서버 만드는 법</summary>
       <ol>
-        <li>GitHub → 프로필 → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token</li>
-        <li>Repository access는 Only select repositories에서 timetable만 선택</li>
-        <li>Permissions → Repository permissions → Contents를 Read and write로 설정</li>
-        <li>만든 토큰을 복사해서 위 칸에 붙여넣고 연결</li>
+        <li>Cloudflare 가입 후 Workers &amp; Pages를 한 번 열고, 계정 ID와 "Workers 편집" API 토큰을 만듭니다.</li>
+        <li>GitHub 저장소 timetable → Settings → Secrets and variables → Actions에 CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, APP_PASSCODE(내가 정할 비밀번호)를 넣습니다.</li>
+        <li>Actions 탭 → "시간표 서버 배포" → Re-run all jobs. 끝나면 요약에 서버 주소가 나옵니다.</li>
+        <li>그 주소와 비밀번호를 위 칸에 넣고 "서버 연결"을 누릅니다. 다른 기기에서도 같은 주소와 비밀번호를 넣으면 같은 내용이 보여요.</li>
       </ol>
-      <p class="note">저장소가 공개라서, 담은 수업과 신청 상태 파일(data/state.json)은 주소를 아는 누구나 읽을 수 있어요. 토큰은 이 기기 브라우저에만 저장되고 언제든 GitHub에서 폐기할 수 있습니다.</p>
+    </details>
+    <details>
+      <summary>GitHub 토큰으로 연결 (서버 없이 쓰는 다른 방법)</summary>
+      <div class="frow" style="margin-top:8px">
+        <input id="sync-token" type="password" placeholder="GitHub 토큰 붙여넣기 (이 기기에만 저장)" autocomplete="off" aria-label="GitHub 토큰">
+        <button type="button" class="tab" id="sync-save">연결</button>
+      </div>
+      <ol>
+        <li>GitHub → Settings → Developer settings → Fine-grained tokens → Generate new token</li>
+        <li>Repository access는 timetable만, Permissions → Contents를 Read and write로 설정</li>
+      </ol>
+      <p class="note">이 방식은 저장 파일(data/state.json)을 주소를 아는 누구나 읽을 수 있어요. 서버 방식은 비밀번호가 있어야만 읽혀요.</p>
     </details>
   </section>
 
@@ -533,8 +544,12 @@ let sha=null,timer=null,syncMsg='';
 const lget=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
 const lset=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
 const token=()=>lget(TKEY)||'';
+const SRVKEY='winter-tt-server';
+function srv(){try{const o=JSON.parse(lget(SRVKEY)||'null');return o&&o.url&&o.pass?o:null}catch(e){return null}}
+const connected=()=>!!(srv()||token());
+const nowTime=()=>new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
 const localT=()=>+lget(MKEY)||0;
-function touch(){if(!SYNC)return;lset(MKEY,String(Date.now()));clearTimeout(timer);if(token())timer=setTimeout(push,1500)}
+function touch(){if(!SYNC)return;lset(MKEY,String(Date.now()));clearTimeout(timer);if(connected())timer=setTimeout(push,1500)}
 const snap=()=>JSON.stringify({v:1,t:localT(),on:Object.fromEntries(Object.entries(on).filter(([,v])=>v)),ov:OV,cu:CUSTOM});
 const b64e=s=>btoa(String.fromCharCode(...new TextEncoder().encode(s)));
 const b64d=s=>new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\n/g,'')),c=>c.charCodeAt(0)));
@@ -542,10 +557,10 @@ const API=()=>`https://api.github.com/repos/${SYNC.owner}/${SYNC.repo}/contents/
 const hdr=()=>({Authorization:'Bearer '+token(),Accept:'application/vnd.github+json'});
 function setMsg(t,bad){const el=$('sync-msg');el.textContent=t;el.className=bad?'bad':'note'}
 function paintSync(){
-  const on_=!!token();
-  $('sync-off').hidden=!on_;$('sync-token').value='';
-  $('sync-token').placeholder=on_?'토큰 바꾸려면 새 토큰 붙여넣기':'GitHub 토큰 붙여넣기 (이 기기에만 저장)';
-  setMsg(syncMsg||(on_?'연결됨 · 담은 수업과 신청 상태를 바꾸면 자동으로 저장돼요.':'연결하지 않은 기기에서는 저장된 내용을 보기만 할 수 있어요(최대 5분 늦게 반영). 이 기기에서 바꾸려면 토큰으로 연결하세요.'));
+  const sv=srv(),on_=connected();
+  $('sync-off').hidden=!on_;$('sync-token').value='';$('sync-pass').value='';
+  $('sync-url').value=sv?sv.url:'';
+  setMsg(syncMsg||(sv?'서버에 연결됨 · 담은 수업, 신청 상태, 내 일정을 바꾸면 자동으로 저장돼요.':on_?'GitHub에 연결됨 · 바꾸면 자동으로 저장돼요.':'연결하지 않았어요. 서버 주소와 비밀번호를 넣으면 이 기기의 내용이 서버에 저장되고, 다른 기기에서도 볼 수 있어요.'));
 }
 function adopt(r){
   if(Array.isArray(r.cu)){
@@ -562,6 +577,15 @@ function adopt(r){
   lset(MKEY,String(r.t||0));render();
 }
 async function pull(){
+  const sv=srv();
+  if(sv){
+    const res=await fetch(sv.url+'/state',{headers:{'X-App-Pass':encodeURIComponent(sv.pass)},cache:'no-store'});
+    if(res.status===404)return null;
+    if(res.status===401)throw new Error('비밀번호가 맞지 않아요.');
+    if(res.status===403)throw new Error('이 주소에서는 서버를 쓸 수 없어요(서버 설정의 허용 주소를 확인하세요).');
+    if(!res.ok)throw new Error('서버 응답 '+res.status);
+    return await res.json();
+  }
   if(token()){
     const res=await fetch(API()+'?ref='+SYNC.branch+'&t='+Date.now(),{headers:hdr(),cache:'no-store'});
     if(res.status===404){sha=null;return null}
@@ -573,6 +597,16 @@ async function pull(){
   return res.ok?await res.json():null;
 }
 async function push(retry){
+  const sv=srv();
+  if(sv){
+    try{
+      const res=await fetch(sv.url+'/state',{method:'PUT',headers:{'X-App-Pass':encodeURIComponent(sv.pass),'Content-Type':'application/json'},body:snap()});
+      if(res.status===401)throw new Error('비밀번호가 맞지 않아요.');
+      if(!res.ok)throw new Error('저장 실패 '+res.status);
+      syncMsg='서버에 연결됨 · '+nowTime()+'에 저장했어요.';paintSync();
+    }catch(e){syncMsg=(e&&e.message&&!/fetch/i.test(e.message))?e.message:'저장하지 못했어요. 인터넷과 서버 주소를 확인하세요.';setMsg(syncMsg,true)}
+    return;
+  }
   if(!token())return;
   try{
     const body={message:'시간표 동기화',content:b64e(snap()),branch:SYNC.branch};if(sha)body.sha=sha;
@@ -587,16 +621,28 @@ async function push(retry){
 async function syncNow(){
   try{
     const r=await pull();
-    if(r&&r.t>localT()){adopt(r);syncMsg=token()?'연결됨 · 다른 기기의 내용을 불러왔어요.':'저장된 내용을 불러왔어요(보기 전용).'}
-    else if(token()&&(r===null?localT()>0:localT()>r.t)){await push();return}
+    if(r&&r.t>localT()){adopt(r);syncMsg=connected()?'연결됨 · 다른 기기의 내용을 불러왔어요.':'저장된 내용을 불러왔어요(보기 전용).'}
+    else if(connected()&&(r===null?localT()>0:localT()>r.t)){await push();return}
     paintSync();
-  }catch(e){syncMsg=e.message||'불러오지 못했어요.';setMsg(syncMsg,true)}
+  }catch(e){syncMsg=(e&&e.message&&!/fetch/i.test(e.message))?e.message:'불러오지 못했어요. 인터넷과 서버 주소를 확인하세요.';setMsg(syncMsg,true)}
 }
 if(SYNC){
   $('sync').hidden=false;paintSync();syncNow();
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncNow()});
   $('sync-save').addEventListener('click',()=>{const v=$('sync-token').value.trim();if(!v)return;lset(TKEY,v);sha=null;syncMsg='';paintSync();syncNow()});
-  $('sync-off').addEventListener('click',()=>{try{localStorage.removeItem(TKEY)}catch(e){}sha=null;syncMsg='';paintSync()});
+  $('sync-off').addEventListener('click',()=>{try{localStorage.removeItem(TKEY);localStorage.removeItem(SRVKEY)}catch(e){}sha=null;syncMsg='';paintSync()});
+  $('sync-srv').addEventListener('click',async()=>{
+    let u=$('sync-url').value.trim().replace(/\/+$/,''),p=$('sync-pass').value;
+    if(!u||!p){setMsg('서버 주소와 비밀번호를 모두 넣어 주세요.',true);return}
+    if(!/^https?:\/\//.test(u))u='https://'+u;
+    lset(SRVKEY,JSON.stringify({url:u,pass:p}));syncMsg='';
+    try{
+      const r=await pull();
+      if(r){adopt(r);syncMsg='서버에 연결됨 · 서버에 저장돼 있던 내용을 불러왔어요.'}
+      else{lset(MKEY,String(Date.now()));await push();return}
+    }catch(e){try{localStorage.removeItem(SRVKEY)}catch(_){}syncMsg=(e&&e.message&&!/fetch/i.test(e.message))?e.message:'서버에 연결하지 못했어요. 주소를 확인하세요.';paintSync();setMsg(syncMsg,true);return}
+    paintSync();
+  });
 }
 </script>
 <script>if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{})</script>

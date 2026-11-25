@@ -1,0 +1,14 @@
+{
+  "name": "timetable-server",
+  "private": true,
+  "type": "module",
+  "description": "겨울방학 시간표 저장용 작은 서버 (Cloudflare Workers + Durable Objects)",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "node --test test/server.test.js"
+  },
+  "devDependencies": {
+    "wrangler": "4.159.0"
+  }
+}
