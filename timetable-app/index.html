@@ -179,25 +179,11 @@ section{display:flex;flex-direction:column;gap:10px;min-width:0}
     </div>
     <div class="shbar"><button type="button" class="tab" id="sync-srv">저장 시작</button><button type="button" class="reset" id="sync-off" hidden>이 기기 연결 해제</button></div>
     <details>
-      <summary>내 코드는 뭐예요? / 서버 만드는 법</summary>
+      <summary>내 코드는 뭐예요?</summary>
       <ol>
         <li>내 코드는 사람마다 따로 정하는 열쇠예요. 같은 코드를 적은 기기끼리만 같은 시간표를 보고, 코드가 다르면 완전히 다른 시간표예요. 코드를 아는 사람은 내 시간표를 볼 수 있으니 남이 알기 어렵게 정하세요. (예: 생일+이름+숫자)</li>
         <li>코드는 4글자 이상이고 한글도 돼요. 서버에는 코드 자체가 아니라 암호화한 값만 저장돼요. 코드를 잊으면 같은 내용을 다시 볼 수 없으니 메모해 두세요.</li>
-        <li>서버는 한 번만 만들면 모두가 같이 써요. Cloudflare 가입 후 계정 ID와 "Workers 편집" API 토큰을 만들고, GitHub 저장소 timetable의 Settings → Secrets and variables → Actions에 CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID를 넣습니다.</li>
-        <li>Actions 탭 → "시간표 서버 배포" → Re-run all jobs. 끝나면 요약에 서버 주소가 나옵니다.</li>
       </ol>
-    </details>
-    <details>
-      <summary>GitHub 토큰으로 연결 (서버 없이 쓰는 다른 방법)</summary>
-      <div class="frow" style="margin-top:8px">
-        <input id="sync-token" type="password" placeholder="GitHub 토큰 붙여넣기 (이 기기에만 저장)" autocomplete="off" aria-label="GitHub 토큰">
-        <button type="button" class="tab" id="sync-save">연결</button>
-      </div>
-      <ol>
-        <li>GitHub → Settings → Developer settings → Fine-grained tokens → Generate new token</li>
-        <li>Repository access는 timetable만, Permissions → Contents를 Read and write로 설정</li>
-      </ol>
-      <p class="note">이 방식은 저장 파일(data/state.json)을 주소를 아는 누구나 읽을 수 있어요. 서버 방식은 비밀번호가 있어야만 읽혀요.</p>
     </details>
   </section>
 
@@ -563,7 +549,7 @@ const hdr=()=>({Authorization:'Bearer '+token(),Accept:'application/vnd.github+j
 function setMsg(t,bad){const el=$('sync-msg');el.textContent=t;el.className=bad?'bad':'note'}
 function paintSync(){
   const sv=srv(),on_=connected();
-  $('sync-off').hidden=!on_;$('sync-token').value='';$('sync-pass').value='';
+  $('sync-off').hidden=!on_;$('sync-pass').value='';
   $('sync-url').value=sv?sv.url:((SYNC&&SYNC.server)||'');
   setMsg(syncMsg||(sv?'내 코드로 서버에 저장 중 · 담은 수업, 신청 상태, 내 일정을 바꾸면 자동으로 저장돼요.':on_?'GitHub에 연결됨 · 바꾸면 자동으로 저장돼요.':'연결하지 않았어요. 내 코드를 적으면 이 기기의 내용이 서버에 저장되고, 같은 코드를 적은 다른 기기에서도 볼 수 있어요.'));
 }
@@ -634,7 +620,6 @@ async function syncNow(){
 if(SYNC){
   $('sync').hidden=false;if(SYNC.server)$('sync-url').hidden=true;paintSync();syncNow();
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncNow()});
-  $('sync-save').addEventListener('click',()=>{const v=$('sync-token').value.trim();if(!v)return;lset(TKEY,v);sha=null;syncMsg='';paintSync();syncNow()});
   $('sync-off').addEventListener('click',()=>{try{localStorage.removeItem(TKEY);localStorage.removeItem(SRVKEY)}catch(e){}sha=null;syncMsg='';paintSync()});
   $('sync-srv').addEventListener('click',async()=>{
     let u=$('sync-url').value.trim().replace(/\/+$/,''),p=$('sync-pass').value.normalize('NFC').trim();
