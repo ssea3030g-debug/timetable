@@ -205,16 +205,16 @@ section{display:flex;flex-direction:column;gap:10px;min-width:0}
     <p class="note" id="sync-msg"></p>
     <div class="frow">
       <input id="sync-url" type="url" placeholder="서버 주소 (https://….workers.dev)" autocomplete="off" aria-label="서버 주소">
-      <input id="sync-pass" type="password" placeholder="비밀번호" autocomplete="off" aria-label="서버 비밀번호">
+      <input id="sync-pass" type="text" placeholder="내 코드 (예: 0310손서영)" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="내 코드">
     </div>
-    <div class="shbar"><button type="button" class="tab" id="sync-srv">서버 연결</button><button type="button" class="reset" id="sync-off" hidden>이 기기 연결 해제</button></div>
+    <div class="shbar"><button type="button" class="tab" id="sync-srv">저장 시작</button><button type="button" class="reset" id="sync-off" hidden>이 기기 연결 해제</button></div>
     <details>
-      <summary>서버 만드는 법</summary>
+      <summary>내 코드는 뭐예요? / 서버 만드는 법</summary>
       <ol>
-        <li>Cloudflare 가입 후 Workers &amp; Pages를 한 번 열고, 계정 ID와 "Workers 편집" API 토큰을 만듭니다.</li>
-        <li>GitHub 저장소 timetable → Settings → Secrets and variables → Actions에 CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID, APP_PASSCODE(내가 정할 비밀번호)를 넣습니다.</li>
+        <li>내 코드는 사람마다 따로 정하는 열쇠예요. 같은 코드를 적은 기기끼리만 같은 시간표를 보고, 코드가 다르면 완전히 다른 시간표예요. 코드를 아는 사람은 내 시간표를 볼 수 있으니 남이 알기 어렵게 정하세요. (예: 생일+이름+숫자)</li>
+        <li>코드는 4글자 이상이고 한글도 돼요. 서버에는 코드 자체가 아니라 암호화한 값만 저장돼요. 코드를 잊으면 같은 내용을 다시 볼 수 없으니 메모해 두세요.</li>
+        <li>서버는 한 번만 만들면 모두가 같이 써요. Cloudflare 가입 후 계정 ID와 "Workers 편집" API 토큰을 만들고, GitHub 저장소 timetable의 Settings → Secrets and variables → Actions에 CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID를 넣습니다.</li>
         <li>Actions 탭 → "시간표 서버 배포" → Re-run all jobs. 끝나면 요약에 서버 주소가 나옵니다.</li>
-        <li>그 주소와 비밀번호를 위 칸에 넣고 "서버 연결"을 누릅니다. 다른 기기에서도 같은 주소와 비밀번호를 넣으면 같은 내용이 보여요.</li>
       </ol>
     </details>
     <details>
@@ -559,8 +559,8 @@ function setMsg(t,bad){const el=$('sync-msg');el.textContent=t;el.className=bad?
 function paintSync(){
   const sv=srv(),on_=connected();
   $('sync-off').hidden=!on_;$('sync-token').value='';$('sync-pass').value='';
-  $('sync-url').value=sv?sv.url:'';
-  setMsg(syncMsg||(sv?'서버에 연결됨 · 담은 수업, 신청 상태, 내 일정을 바꾸면 자동으로 저장돼요.':on_?'GitHub에 연결됨 · 바꾸면 자동으로 저장돼요.':'연결하지 않았어요. 서버 주소와 비밀번호를 넣으면 이 기기의 내용이 서버에 저장되고, 다른 기기에서도 볼 수 있어요.'));
+  $('sync-url').value=sv?sv.url:((SYNC&&SYNC.server)||'');
+  setMsg(syncMsg||(sv?'내 코드로 서버에 저장 중 · 담은 수업, 신청 상태, 내 일정을 바꾸면 자동으로 저장돼요.':on_?'GitHub에 연결됨 · 바꾸면 자동으로 저장돼요.':'연결하지 않았어요. 내 코드를 적으면 이 기기의 내용이 서버에 저장되고, 같은 코드를 적은 다른 기기에서도 볼 수 있어요.'));
 }
 function adopt(r){
   if(Array.isArray(r.cu)){
@@ -579,9 +579,9 @@ function adopt(r){
 async function pull(){
   const sv=srv();
   if(sv){
-    const res=await fetch(sv.url+'/state',{headers:{'X-App-Pass':encodeURIComponent(sv.pass)},cache:'no-store'});
+    const res=await fetch(sv.url+'/state',{headers:{'X-App-Key':encodeURIComponent(sv.pass.normalize('NFC').trim())},cache:'no-store'});
     if(res.status===404)return null;
-    if(res.status===401)throw new Error('비밀번호가 맞지 않아요.');
+    if(res.status===401)throw new Error('코드를 4글자 이상 적어 주세요.');
     if(res.status===403)throw new Error('이 주소에서는 서버를 쓸 수 없어요(서버 설정의 허용 주소를 확인하세요).');
     if(!res.ok)throw new Error('서버 응답 '+res.status);
     return await res.json();
@@ -600,10 +600,10 @@ async function push(retry){
   const sv=srv();
   if(sv){
     try{
-      const res=await fetch(sv.url+'/state',{method:'PUT',headers:{'X-App-Pass':encodeURIComponent(sv.pass),'Content-Type':'application/json'},body:snap()});
-      if(res.status===401)throw new Error('비밀번호가 맞지 않아요.');
+      const res=await fetch(sv.url+'/state',{method:'PUT',headers:{'X-App-Key':encodeURIComponent(sv.pass.normalize('NFC').trim()),'Content-Type':'application/json'},body:snap()});
+      if(res.status===401)throw new Error('코드를 4글자 이상 적어 주세요.');
       if(!res.ok)throw new Error('저장 실패 '+res.status);
-      syncMsg='서버에 연결됨 · '+nowTime()+'에 저장했어요.';paintSync();
+      syncMsg='내 코드로 서버에 저장 중 · '+nowTime()+'에 저장했어요.';paintSync();
     }catch(e){syncMsg=(e&&e.message&&!/fetch/i.test(e.message))?e.message:'저장하지 못했어요. 인터넷과 서버 주소를 확인하세요.';setMsg(syncMsg,true)}
     return;
   }
@@ -627,19 +627,20 @@ async function syncNow(){
   }catch(e){syncMsg=(e&&e.message&&!/fetch/i.test(e.message))?e.message:'불러오지 못했어요. 인터넷과 서버 주소를 확인하세요.';setMsg(syncMsg,true)}
 }
 if(SYNC){
-  $('sync').hidden=false;paintSync();syncNow();
+  $('sync').hidden=false;if(SYNC.server)$('sync-url').hidden=true;paintSync();syncNow();
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncNow()});
   $('sync-save').addEventListener('click',()=>{const v=$('sync-token').value.trim();if(!v)return;lset(TKEY,v);sha=null;syncMsg='';paintSync();syncNow()});
   $('sync-off').addEventListener('click',()=>{try{localStorage.removeItem(TKEY);localStorage.removeItem(SRVKEY)}catch(e){}sha=null;syncMsg='';paintSync()});
   $('sync-srv').addEventListener('click',async()=>{
-    let u=$('sync-url').value.trim().replace(/\/+$/,''),p=$('sync-pass').value;
-    if(!u||!p){setMsg('서버 주소와 비밀번호를 모두 넣어 주세요.',true);return}
+    let u=$('sync-url').value.trim().replace(/\/+$/,''),p=$('sync-pass').value.normalize('NFC').trim();
+    if(!u){setMsg('서버 주소를 넣어 주세요.',true);return}
+    if(p.length<4){setMsg('코드를 4글자 이상 적어 주세요.',true);return}
     if(!/^https?:\/\//.test(u))u='https://'+u;
     lset(SRVKEY,JSON.stringify({url:u,pass:p}));syncMsg='';
     try{
       const r=await pull();
-      if(r){adopt(r);syncMsg='서버에 연결됨 · 서버에 저장돼 있던 내용을 불러왔어요.'}
-      else{lset(MKEY,String(Date.now()));await push();return}
+      if(r){adopt(r);syncMsg='이 코드로 저장돼 있던 내용을 불러왔어요.'}
+      else{lset(MKEY,String(Date.now()));await push();syncMsg='처음 쓰는 코드예요. 이 기기의 내용을 저장했어요. 다른 기기에서도 같은 코드를 적으면 이 내용이 보여요.';paintSync();return}
     }catch(e){try{localStorage.removeItem(SRVKEY)}catch(_){}syncMsg=(e&&e.message&&!/fetch/i.test(e.message))?e.message:'서버에 연결하지 못했어요. 주소를 확인하세요.';paintSync();setMsg(syncMsg,true);return}
     paintSync();
   });
