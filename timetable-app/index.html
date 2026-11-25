@@ -143,6 +143,7 @@ section{display:flex;flex-direction:column;gap:10px;min-width:0}
 .modal .mb button.pri{background:#fff;color:#0b1a38}
 .cell{cursor:pointer}
 .cell:hover{border-color:var(--muted)}
+.addrow{flex:none;height:14px;line-height:14px;text-align:center;font-size:13px;color:var(--line)}
 .cell.vac::after{content:'+';margin:auto;color:var(--line);font-size:22px;line-height:1}
 .cform{background:var(--surface);color:var(--fg);border-radius:12px;padding:16px;width:min(420px,100%);display:flex;flex-direction:column;gap:10px;margin:auto 0}
 .cform h3{margin:0;font-size:16px}
@@ -311,10 +312,10 @@ function renderTop(cl){
       const its=act.filter(i=>i.days.includes(d)&&band(i)===b).sort((m,n)=>mins(m.a)-mins(n.a));
       const clash=its.some(i=>bad.has(i.id+d));
       g+=`<div class="cell${clash?' clash':''}${its.length?'':' vac'}" data-day="${d}" data-band="${b}">`+its.map(i=>
-        `<button type="button" class="chip s-${i.s} ${i.st==='ok'||i.custom?'':i.st}" data-${i.custom?'cu':'id'}="${i.id}" title="${i.custom?'눌러서 고치기·지우기':'누르면 시간표에서 뺍니다'}">`+
+        `<button type="button" class="chip s-${i.s} ${i.st==='ok'||i.custom?'':i.st}" style="flex:${Math.max(1,mins(i.b)-mins(i.a))} 1 auto" data-${i.custom?'cu':'id'}="${i.id}" title="${i.custom?'눌러서 고치기·지우기':'누르면 시간표에서 뺍니다'}">`+
         `<span class="tm">${i.a}–${i.b}${i.ac?' · '+esc(i.ac):''}</span><span class="t">${esc(i.custom?i.d:tname(i))}</span><span class="d">${esc(i.custom?(i.note||''):i.d+(i.n?` (${i.n}회)`:''))}</span>`+
         `${i.per?`<span class="st">${esc(i.per)}</span>`:''}`+
-        `${i.custom?(bad.has(i.id+d)?'<span class="st x">겹침</span>':''):`<span class="st${bad.has(i.id+d)?' x':''}">${stLabel(i)}${bad.has(i.id+d)?' · 겹침':''}</span>`}</button>`).join('')+`</div>`;
+        `${i.custom?(bad.has(i.id+d)?'<span class="st x">겹침</span>':''):`<span class="st${bad.has(i.id+d)?' x':''}">${stLabel(i)}${bad.has(i.id+d)?' · 겹침':''}</span>`}</button>`).join('')+(its.length?'<span class="addrow" aria-hidden="true">+</span>':'')+`</div>`;
     });
   }
   $('grid').innerHTML=g;
@@ -497,7 +498,9 @@ function drawTimetable(all){
       ctx.fillStyle='#ffffff';ctx.strokeStyle='#d5dbe6';ctx.lineWidth=1;ctx.setLineDash([]);
       rr(ctx,cx(d),y,cw,rh[b],6);ctx.fill();ctx.stroke();
       let yy=y+G;
-      cell.forEach(({i,lines,h})=>{
+      const used=cell.reduce((a,x)=>a+x.h+G,0)+G,extra=Math.max(0,rh[b]-used),tm=cell.reduce((a,x)=>a+Math.max(1,mins(x.i.b)-mins(x.i.a)),0);
+      cell.forEach(({i,lines,h:h0})=>{
+        const h=h0+extra*Math.max(1,mins(i.b)-mins(i.a))/tm;
         const col=SJC[i.s]||'#5a6472';
         ctx.setLineDash(i.custom?[]:i.st==='w'?[5,3]:i.st==='c'?[2,3]:[]);
         ctx.fillStyle=(i.st==='c'&&!i.custom)?'#ffffff':col+'1f';ctx.strokeStyle=col;ctx.lineWidth=1.5;
