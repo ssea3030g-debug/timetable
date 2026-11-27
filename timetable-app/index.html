@@ -505,6 +505,7 @@ function drawTimetable(all){
         ctx.setLineDash(i.custom?[]:i.st==='w'?[5,3]:i.st==='c'?[2,3]:[]);
         ctx.fillStyle=(i.st==='c'&&!i.custom)?'#ffffff':col+'1f';ctx.strokeStyle=col;ctx.lineWidth=1.5;
         rr(ctx,cx(d)+3,yy,cw-6,h,5);ctx.fill();ctx.stroke();ctx.setLineDash([]);
+        if(CAND[i.id]&&!i.custom){ctx.save();rr(ctx,cx(d)+3,yy,cw-6,h,5);ctx.clip();ctx.strokeStyle=col+'66';ctx.lineWidth=1.2;const x0=cx(d)+3,y0=yy,x1=x0+cw-6;for(let k=-h;k<cw;k+=6){ctx.beginPath();ctx.moveTo(x0+k,y0+h);ctx.lineTo(x0+k+h,y0);ctx.stroke()}ctx.restore()}
         let ty=yy+pad-1;ctx.textAlign='left';
         lines.forEach(l=>{ctx.font=l.f;ctx.fillStyle=l.c;ctx.fillText(l.t,cx(d)+3+pad,ty+l.h-4);ty+=l.h});
         yy+=h+G;
