@@ -158,6 +158,8 @@ section{display:flex;flex-direction:column;gap:10px;min-width:0}
 .cform .cbtn button.pri{background:var(--navy);color:var(--bg)}
 .cform .cbtn button.del{border-color:var(--warn);color:var(--warn);margin-left:auto}
 .cform .bad{margin:0;color:var(--warn);font-size:12.5px;font-weight:600}
+.row.cand{opacity:.5}
+.row.cand:hover,.row.cand:focus-within{opacity:1}
 .star{font:inherit;font-size:12px;font-weight:600;cursor:pointer;border-radius:8px;padding:5px 10px;border:1.5px solid var(--line);background:transparent;color:var(--muted)}
 .star[aria-pressed="true"]{border-color:var(--soc);color:var(--soc);background:color-mix(in oklab,var(--soc) 14%,var(--surface))}
 .none{padding:24px 12px;text-align:center;color:var(--muted);font-size:13px}
@@ -354,7 +356,7 @@ function renderList(cl,bad){
   $('list').innerHTML=Object.keys(SUBJ).map(s=>{
     const its=shown.filter(i=>i.s===s);if(!its.length)return '';
     return `<div class="grp s-${s}">${SUBJ[s]}<span>${its.length}개 · ${its.filter(i=>on[i.id]).length}개 담음</span></div>`+its.map(i=>
-      `<div class="row s-${i.s}${on[i.id]?'':' off'}"><div class="when"><b>${i.days.length>3?'매일':i.days.join('·')}</b>${i.a}–${i.b}</div>`+
+      `<div class="row s-${i.s}${on[i.id]?'':' off'}${CAND[i.id]?' cand':''}"><div class="when"><b>${i.days.length>3?'매일':i.days.join('·')}</b>${i.a}–${i.b}</div>`+
       `<div class="what"><div class="n"><em>${CAND[i.id]?'★ ':''}${esc(tname(i))}</em> ${esc(i.d)}${i.n?` (${i.n}회)`:''}</div>`+
       `<div class="m">${i.ac?`<span class="pill ac">${esc(i.ac)}</span>`:''}<span class="pill">${i.k}</span>`+
       `${i.st!=='c'||i.closed?`<span class="pill">${stLabel(i)}</span>`:''}`+
