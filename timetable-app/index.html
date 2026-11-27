@@ -158,6 +158,8 @@ section{display:flex;flex-direction:column;gap:10px;min-width:0}
 .cform .cbtn button.pri{background:var(--navy);color:var(--bg)}
 .cform .cbtn button.del{border-color:var(--warn);color:var(--warn);margin-left:auto}
 .cform .bad{margin:0;color:var(--warn);font-size:12.5px;font-weight:600}
+.star{font:inherit;font-size:12px;font-weight:600;cursor:pointer;border-radius:8px;padding:5px 10px;border:1.5px solid var(--line);background:transparent;color:var(--muted)}
+.star[aria-pressed="true"]{border-color:var(--soc);color:var(--soc);background:color-mix(in oklab,var(--soc) 14%,var(--surface))}
 .none{padding:24px 12px;text-align:center;color:var(--muted);font-size:13px}
 </style>
 
@@ -262,10 +264,15 @@ function applyOv(i){
   i.lab=(o.st===g.st&&!o.q)?g.lab:undefined;
 }
 ITEMS.forEach(applyOv);
+const CDKEY='winter-tt-cand-v1';
+let CAND={};try{(JSON.parse(localStorage.getItem(CDKEY)||'[]')||[]).forEach(k=>{CAND[k]=true})}catch(e){CAND={}}
+const candList=()=>Object.keys(CAND).filter(k=>CAND[k]);
+const saveCand=()=>{try{localStorage.setItem(CDKEY,JSON.stringify(candList()))}catch(e){}touch()};
 const SOPT=[['c','미신청'],['closed','마감'],['w','신청중·대기'],['ok','신청완료']];
 const sval=i=>i.st==='c'?(i.closed?'closed':'c'):i.st;
 const ctl=i=>`<div class="ctl"><select id="st-${i.id}" data-st="${i.id}" aria-label="신청 상태">${SOPT.map(([v,l])=>`<option value="${v}"${sval(i)===v?' selected':''}>${l}</option>`).join('')}</select>`+
-  `${i.st==='w'?`<input id="q-${i.id}" data-q="${i.id}" type="number" inputmode="numeric" min="1" placeholder="대기 번호" value="${i.q||''}" aria-label="대기 번호">`:''}</div>`;
+  `${i.st==='w'?`<input id="q-${i.id}" data-q="${i.id}" type="number" inputmode="numeric" min="1" placeholder="대기 번호" value="${i.q||''}" aria-label="대기 번호">`:''}`+
+  `<button type="button" class="star" data-cand="${i.id}" aria-pressed="${!!CAND[i.id]}">${CAND[i.id]?'★ 후보':'☆ 후보'}</button></div>`;
 const stLabel=it=>it.lab?it.lab:it.st==='ok'?'신청완료':it.st==='w'?(it.q?'대기 '+it.q:it.ord?'신청중 · 순번 '+it.ord:'신청중(대기 포함)'):it.closed?'미신청 · 마감':'미신청';
 
 function clashes(){
@@ -287,7 +294,7 @@ function renderTop(cl){
   $('stats').innerHTML=`<span><b>${act.filter(i=>!i.custom).length}</b> 담은 수업</span>${act.some(i=>i.custom)?`<span><b>${act.filter(i=>i.custom).length}</b> 내 일정</span>`:''}<span><b>${ses}</b> 수업/주</span><span><b>${hrs%1?hrs.toFixed(1):hrs}</b> 시간/주</span>`+
     `<span class="${cl.length?'bad':''}"><b>${cl.length}</b> 겹침</span>`;
   const n=s=>ITEMS.filter(i=>i.st===s).length;
-  $('mystat').innerHTML=`<span>내 신청 전체</span><span><b>${n('ok')}</b> 신청완료</span><span><b>${n('w')}</b> 신청중·대기</span>`;
+  $('mystat').innerHTML=`<span>내 신청 전체</span><span><b>${n('ok')}</b> 신청완료</span><span><b>${n('w')}</b> 신청중·대기</span><span><b>${candList().filter(k=>ITEMS.some(i=>i.id===k&&!i.custom)).length}</b> 후보</span>`;
   $('conflicts').innerHTML=!act.length?'':cl.length
     ?`<div class="conflicts">${cl.map(c=>`<div><strong>${c.d}요일 ${BL[band(c.p)][0]}</strong> · ${esc(tname(c.p))} ${esc(c.p.d)} ↔ ${esc(tname(c.q))} ${esc(c.q.d)}</div>`).join('')}</div>`
     :`<div class="ok">겹치는 수업이 없습니다.</div>`;
@@ -301,7 +308,7 @@ function renderTop(cl){
       const clash=its.some(i=>bad.has(i.id+d));
       g+=`<div class="cell${clash?' clash':''}${its.length?'':' vac'}" data-day="${d}" data-band="${b}">`+its.map(i=>
         `<button type="button" class="chip s-${i.s} ${i.st==='ok'||i.custom?'':i.st}" style="flex:${Math.max(1,mins(i.b)-mins(i.a))} 1 auto" data-${i.custom?'cu':'id'}="${i.id}" title="${i.custom?'눌러서 고치기·지우기':'누르면 시간표에서 뺍니다'}">`+
-        `<span class="tm">${i.a}–${i.b}${i.ac?' · '+esc(i.ac):''}</span><span class="t">${esc(i.custom?i.d:tname(i))}</span><span class="d">${esc(i.custom?(i.note||''):i.d+(i.n?` (${i.n}회)`:''))}</span>`+
+        `<span class="tm">${i.a}–${i.b}${i.ac?' · '+esc(i.ac):''}</span><span class="t">${CAND[i.id]&&!i.custom?'★ ':''}${esc(i.custom?i.d:tname(i))}</span><span class="d">${esc(i.custom?(i.note||''):i.d+(i.n?` (${i.n}회)`:''))}</span>`+
         `${i.per?`<span class="st">${esc(i.per)}</span>`:''}`+
         `${i.custom?(bad.has(i.id+d)?'<span class="st x">겹침</span>':''):`<span class="st${bad.has(i.id+d)?' x':''}">${stLabel(i)}${bad.has(i.id+d)?' · 겹침':''}</span>`}</button>`).join('')+(its.length?'<span class="addrow" aria-hidden="true">+</span>':'')+`</div>`;
     });
@@ -314,6 +321,7 @@ function matches(i){
   if(i.custom)return false;
   if(F.mode==='mine'&&i.st==='c')return false;
   if(F.mode==='sel'&&!on[i.id])return false;
+  if(F.mode==='cand'&&!CAND[i.id])return false;
   if(F.sj&&i.s!==F.sj)return false;
   if(F.ac&&i.ac!==F.ac)return false;
   if(F.day&&!i.days.includes(F.day))return false;
@@ -322,10 +330,10 @@ function matches(i){
   return true;
 }
 function renderControls(){
-  const R=ITEMS.filter(i=>!i.custom);const nMine=R.filter(i=>i.st!=='c').length,nSel=R.filter(i=>on[i.id]).length;
-  $('tabs').innerHTML=[['all','전체 강좌',R.length],['mine','내 신청',nMine],['sel','시간표에 담은 것',nSel]].map(([k,v,n])=>
+  const R=ITEMS.filter(i=>!i.custom);const nCand=R.filter(i=>CAND[i.id]).length;const nMine=R.filter(i=>i.st!=='c').length,nSel=R.filter(i=>on[i.id]).length;
+  $('tabs').innerHTML=[['all','전체 강좌',R.length],['mine','내 신청',nMine],['cand','후보 ★',nCand],['sel','시간표에 담은 것',nSel]].map(([k,v,n])=>
     `<button type="button" class="tab" data-mode="${k}" aria-pressed="${F.mode===k}">${v} ${n}</button>`).join('');
-  const base=R.filter(i=>F.mode==='mine'?i.st!=='c':F.mode==='sel'?on[i.id]:true);
+  const base=R.filter(i=>F.mode==='mine'?i.st!=='c':F.mode==='sel'?on[i.id]:F.mode==='cand'?CAND[i.id]:true);
   const cnt={};base.forEach(i=>cnt[i.s]=(cnt[i.s]||0)+1);
   $('sjchips').innerHTML=`<button type="button" class="fc" data-sj="" aria-pressed="${F.sj===''}">전체<small>${base.length}</small></button>`+
     Object.entries(SUBJ).filter(([k])=>cnt[k]).map(([k,v])=>`<button type="button" class="fc s-${k}" data-sj="${k}" aria-pressed="${F.sj===k}">${v}<small>${cnt[k]}</small></button>`).join('');
@@ -347,7 +355,7 @@ function renderList(cl,bad){
     const its=shown.filter(i=>i.s===s);if(!its.length)return '';
     return `<div class="grp s-${s}">${SUBJ[s]}<span>${its.length}개 · ${its.filter(i=>on[i.id]).length}개 담음</span></div>`+its.map(i=>
       `<div class="row s-${i.s}${on[i.id]?'':' off'}"><div class="when"><b>${i.days.length>3?'매일':i.days.join('·')}</b>${i.a}–${i.b}</div>`+
-      `<div class="what"><div class="n"><em>${esc(tname(i))}</em> ${esc(i.d)}${i.n?` (${i.n}회)`:''}</div>`+
+      `<div class="what"><div class="n"><em>${CAND[i.id]?'★ ':''}${esc(tname(i))}</em> ${esc(i.d)}${i.n?` (${i.n}회)`:''}</div>`+
       `<div class="m">${i.ac?`<span class="pill ac">${esc(i.ac)}</span>`:''}<span class="pill">${i.k}</span>`+
       `${i.st!=='c'||i.closed?`<span class="pill">${stLabel(i)}</span>`:''}`+
       `${i.sd?`<span>개강 ${md(i.sd)}</span>`:''}${i.per?`<span class="pill">${esc(i.per)}</span>`:''}`+
@@ -361,6 +369,7 @@ function renderListOnly(){renderControls();renderList(clashes())}
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-id]');
   if(b){on[b.dataset.id]=!on[b.dataset.id];save();render();return}
+  const cd=e.target.closest('[data-cand]');if(cd){const k=cd.dataset.cand;if(CAND[k])delete CAND[k];else CAND[k]=true;saveCand();render();return}
   const cu=e.target.closest('[data-cu]');if(cu){openCust({id:cu.dataset.cu});return}
   const cell=e.target.closest('.cell[data-day]');if(cell){openCust({day:cell.dataset.day,band:+cell.dataset.band});return}
   const t=e.target.closest('[data-mode]');if(t){F.mode=t.dataset.mode;saveF();renderListOnly();return}
@@ -541,7 +550,7 @@ const connected=()=>!!(srv()||token());
 const nowTime=()=>new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'});
 const localT=()=>+lget(MKEY)||0;
 function touch(){if(!SYNC)return;lset(MKEY,String(Date.now()));clearTimeout(timer);if(connected())timer=setTimeout(push,1500)}
-const snap=()=>JSON.stringify({v:1,t:localT(),on:Object.fromEntries(Object.entries(on).filter(([,v])=>v)),ov:OV,cu:CUSTOM});
+const snap=()=>JSON.stringify({v:1,t:localT(),on:Object.fromEntries(Object.entries(on).filter(([,v])=>v)),ov:OV,cu:CUSTOM,cd:candList()});
 const b64e=s=>btoa(String.fromCharCode(...new TextEncoder().encode(s)));
 const b64d=s=>new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\n/g,'')),c=>c.charCodeAt(0)));
 const API=()=>`https://api.github.com/repos/${SYNC.owner}/${SYNC.repo}/contents/${SYNC.path}`;
@@ -554,6 +563,7 @@ function paintSync(){
   setMsg(syncMsg||(sv?'내 코드로 서버에 저장 중 · 담은 수업, 신청 상태, 내 일정을 바꾸면 자동으로 저장돼요.':on_?'GitHub에 연결됨 · 바꾸면 자동으로 저장돼요.':'연결하지 않았어요. 내 코드를 적으면 이 기기의 내용이 서버에 저장되고, 같은 코드를 적은 다른 기기에서도 볼 수 있어요.'));
 }
 function adopt(r){
+  if(Array.isArray(r.cd)){CAND={};r.cd.forEach(k=>{if(typeof k==='string')CAND[k]=true});try{localStorage.setItem(CDKEY,JSON.stringify(candList()))}catch(e){}}
   if(Array.isArray(r.cu)){
     CUSTOM.forEach(c=>{const k=ITEMS.indexOf(c);if(k>=0)ITEMS.splice(k,1)});
     CUSTOM=r.cu.filter(c=>c&&typeof c.id==='string'&&typeof c.d==='string'&&Array.isArray(c.days)&&/^\d\d:\d\d$/.test(c.a||'')&&/^\d\d:\d\d$/.test(c.b||'')).map(c=>({id:c.id,custom:1,s:SJC[c.s]?c.s:'my',t:'',d:c.d.slice(0,30),note:String(c.note||'').slice(0,40),ac:'',k:'내 일정',n:'',st:'c',a:c.a,b:c.b,days:c.days.filter(d=>DAYS.includes(d))}));
